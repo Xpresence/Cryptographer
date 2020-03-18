@@ -1,6 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.IO;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Xml.Serialization;
 
 namespace Cryptographer
 {
@@ -19,14 +22,63 @@ namespace Cryptographer
 
 
 
-        public T DecryptAES<T>(string key, string key_AES, string IV_AES)
+        public T DecryptAES<T>(string encryptedKey, string key_AES, string iv_AES)
         {
-            throw new NotImplementedException();
+            using (AesCryptoServiceProvider aes = new AesCryptoServiceProvider())
+            {
+                aes.Key = Convert.FromBase64String(key_AES);
+                aes.IV = Convert.FromBase64String(iv_AES);
+
+                var encryptedBytes = Convert.FromBase64String(encryptedKey);
+
+                ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+
+                using (var ms = new MemoryStream(encryptedBytes))
+                using (var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read))
+                using (var sr = new StreamReader(cs))
+                {
+                    var decryptedData = sr.ReadToEnd();
+                    return JsonSerializer.Deserialize<T>(decryptedData);
+                }
+            }
         }
 
-        public bool VerifyHashRSA(string hash, string publicKey)
+        public bool VerifyHashRSA<T>(T data, string hash, string publicKey_RSA)
         {
-            throw new NotImplementedException();
+            using (var rsa = new RSACryptoServiceProvider())
+            {
+                try
+                {
+                    RSAParameters RSAKey;
+                    {
+                        var sr = new StringReader(publicKey_RSA);
+                        var xs = new XmlSerializer(typeof(RSAParameters));
+                        RSAKey = (RSAParameters)xs.Deserialize(sr);
+                    }
+
+                    rsa.ImportParameters(RSAKey);
+
+                    var json = JsonSerializer.Serialize<T>(data);
+                    Console.WriteLine("Serialized data in VerifyHashRSA is:");
+                    Console.WriteLine(json);
+                    Console.WriteLine();
+
+                    var byteData = Encoding.UTF8.GetBytes(json);
+                    var byteCryptedHash = Convert.FromBase64String(hash);
+
+                    var verifyHash = rsa.VerifyData(byteData, new MD5CryptoServiceProvider(), byteCryptedHash);
+
+                    return verifyHash;
+                }
+                catch (FormatException)
+                {
+                    return false;
+                }
+                finally
+                {
+                    rsa.PersistKeyInCsp = false;
+                }
+            }
         }
     }
 }

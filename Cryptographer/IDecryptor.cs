@@ -2,9 +2,8 @@
 {
     interface IDecryptor
     {
-        //T DecryptKey<T>(string key);
         T DecryptAES<T>(string encryptedKey, string key_AES, string iv_AES);
-        bool VerifyHashRSA(string hash, string publicKey_RSA);
+        bool VerifyHashRSA<T>(T data, string hash, string publicKey_RSA);
 
         string PublicKey_RSA { get; }
         string Key_AES { get; }
